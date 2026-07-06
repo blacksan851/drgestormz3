@@ -1,0 +1,6 @@
+{
+  "name": "Dr Gestor Payment",
+  "description": "Sistema de controle de pagamentos de aplicativos com checkout transparente e integração com a PaySuite (M-Pesa e eMola).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

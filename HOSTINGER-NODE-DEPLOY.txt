@@ -1,0 +1,20 @@
+﻿HOSTINGER NODE.JS - PUBLICACAO COMPLETA
+
+1. Use o pacote completo do projeto, nao apenas o pacote estatico.
+2. No ambiente Node.js da Hostinger, envie o conteudo do projeto.
+3. Crie o ficheiro .env a partir de .env.hostinger.example.
+4. Preencha APP_URL com o dominio final.
+5. Se for usar Supabase, execute antes o ficheiro SUPABASE-SETUP.sql no SQL Editor do projeto.
+6. Preencha SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.
+7. Preencha o login administrativo e a senha forte do painel.
+8. Preencha o token PaySuite no painel depois do primeiro login ou ajuste no ambiente se preferir.
+9. Instale as dependencias com npm install.
+10. Gere a build com npm run build.
+11. Inicie a aplicacao com node server.mjs ou use o comando equivalente do painel Node.js.
+
+RESULTADO
+- /login abre o painel protegido
+- /checkout/:id continua publico para os clientes
+- os dados passam a ser salvos no Supabase quando STORAGE_DRIVER="supabase"
+- o backend protege produtos, clientes, assinaturas, transacoes e credenciais PaySuite
+- o modo MySQL continua disponivel como alternativa
