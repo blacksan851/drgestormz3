@@ -181,8 +181,8 @@ export default function App() {
       <div className="auth-card">
         <div className="brand-box">
           <p className="eyebrow">DR Gestor</p>
-          <h1>Sistema de Login e Cadastro</h1>
-          <p>Controle de acesso do caixa e do administrador.</p>
+          <h1>Login</h1>
+          <p>Cadastro</p>
         </div>
 
         <div className="tabs">
@@ -191,14 +191,14 @@ export default function App() {
             className={mode === 'login' ? 'active' : ''}
             onClick={() => setMode('login')}
           >
-            Entrar
+            Login
           </button>
           <button
             type="button"
             className={mode === 'register' ? 'active' : ''}
             onClick={() => setMode('register')}
           >
-            Cadastrar caixa
+            Cadastro
           </button>
         </div>
 
