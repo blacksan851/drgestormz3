@@ -5,14 +5,18 @@ import path from 'path';
 import express from 'express';
 import {
   finalizePendingPayment,
+  findUserByCredentials,
+  getCaixas,
   getPendingPayment,
   getProviderConfig,
   getPublicState,
   getStorageDriver,
   readInternalState,
   recordPendingPayment,
+  registerCaixa,
   replaceResource,
   savePaymentConfig,
+  updateInternalState,
 } from './server-store.mjs';
 
 const app = express();
@@ -58,6 +62,10 @@ function getAdminProfile() {
   };
 }
 
+function normalizeLoginKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function encodeBase64Url(input) {
   return Buffer.from(input, 'utf8').toString('base64url');
 }
@@ -70,11 +78,24 @@ function signAuthPayload(encodedPayload) {
   return crypto.createHmac('sha256', AUTH_SECRET).update(encodedPayload).digest('base64url');
 }
 
-function createAuthToken() {
+function buildUserProfile(user) {
+  const role = String(user?.role || 'caixa').toLowerCase();
+  return {
+    id: user?.id || user?.login || 'user',
+    login: String(user?.login || '').trim(),
+    email: String(user?.email || '').trim(),
+    name: String(user?.name || user?.login || 'Usuário').trim(),
+    role,
+    caixa: user?.caixa || null,
+  };
+}
+
+function createAuthTokenForUser(user) {
   const payload = {
-    ...getAdminProfile(),
+    ...buildUserProfile(user),
     exp: Date.now() + (AUTH_SESSION_HOURS * 60 * 60 * 1000),
   };
+
   const encodedPayload = encodeBase64Url(JSON.stringify(payload));
   const signature = signAuthPayload(encodedPayload);
   return `${encodedPayload}.${signature}`;
@@ -96,15 +117,11 @@ function parseAuthToken(token) {
 
   try {
     const payload = JSON.parse(decodeBase64Url(encodedPayload));
-    if (!payload || payload.exp < Date.now()) {
+    if (!payload || Number(payload.exp || 0) < Date.now()) {
       return null;
     }
 
-    if (String(payload.login || '').toLowerCase() !== ADMIN_LOGIN || String(payload.email || '').toLowerCase() !== ADMIN_EMAIL) {
-      return null;
-    }
-
-    return getAdminProfile();
+    return buildUserProfile(payload);
   } catch {
     return null;
   }
@@ -119,15 +136,25 @@ function readBearerToken(request) {
   return header.slice(7).trim();
 }
 
-function requireAdminAuth(request, response, next) {
-  const adminUser = parseAuthToken(readBearerToken(request));
-  if (!adminUser) {
+function requireAuth(request, response, next, allowedRoles = ['admin', 'caixa']) {
+  const user = parseAuthToken(readBearerToken(request));
+  if (!user) {
     response.status(401).json({ status: 'error', message: 'Sessao invalida ou expirada.' });
     return;
   }
 
-  request.adminUser = adminUser;
+  const role = String(user.role || '').toLowerCase();
+  if (!allowedRoles.map((item) => item.toLowerCase()).includes(role)) {
+    response.status(403).json({ status: 'error', message: 'Sem permissao para acessar este recurso.' });
+    return;
+  }
+
+  request.user = user;
   next();
+}
+
+function requireAdminAuth(request, response, next) {
+  return requireAuth(request, response, next, ['admin']);
 }
 
 function resolveApiBaseUrl(environmentHeader) {
@@ -316,8 +343,8 @@ app.get('/api/health', (_request, response) => {
   });
 });
 
-app.post('/api/auth/login', (request, response) => {
-  const identifier = String(request.body?.identifier || '').trim().toLowerCase();
+app.post('/api/auth/login', async (request, response) => {
+  const identifier = normalizeLoginKey(request.body?.identifier || '');
   const password = String(request.body?.password || '');
 
   if (!identifier || !password) {
@@ -325,28 +352,70 @@ app.post('/api/auth/login', (request, response) => {
     return;
   }
 
-  const validIdentifier = identifier === ADMIN_LOGIN || identifier === ADMIN_EMAIL;
-  if (!validIdentifier || password !== ADMIN_PASSWORD) {
+  const adminUser = (identifier === ADMIN_LOGIN || identifier === ADMIN_EMAIL)
+    && password === ADMIN_PASSWORD
+    ? getAdminProfile()
+    : null;
+
+  const registeredUser = adminUser || await findUserByCredentials(identifier, password);
+
+  if (!registeredUser) {
     response.status(401).json({ status: 'error', message: 'Credenciais invalidas.' });
     return;
   }
 
   response.json({
     status: 'success',
-    token: createAuthToken(),
-    user: getAdminProfile(),
+    token: createAuthTokenForUser(registeredUser),
+    user: registeredUser,
   });
 });
 
-app.get('/api/auth/session', requireAdminAuth, (request, response) => {
+app.post('/api/auth/register', async (request, response) => {
+  try {
+    const payload = {
+      name: String(request.body?.name || '').trim(),
+      login: String(request.body?.login || '').trim(),
+      email: String(request.body?.email || '').trim(),
+      password: String(request.body?.password || ''),
+      caixa: String(request.body?.caixa || '').trim(),
+    };
+
+    if (!payload.name || !payload.login || !payload.email || !payload.password || !payload.caixa) {
+      response.status(400).json({ status: 'error', message: 'Preencha nome, login, email, senha e numero do caixa.' });
+      return;
+    }
+
+    const user = await registerCaixa(payload);
+    response.status(201).json({
+      status: 'success',
+      message: 'Caixa cadastrado com sucesso.',
+      user,
+    });
+  } catch (error) {
+    response.status(400).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Nao foi possivel cadastrar o caixa.',
+    });
+  }
+});
+
+app.get('/api/auth/session', requireAuth, (request, response) => {
   response.json({
     status: 'success',
-    user: request.adminUser,
+    user: request.user,
   });
 });
 
 app.post('/api/auth/logout', (_request, response) => {
   response.json({ status: 'success' });
+});
+
+app.get('/api/caixas', requireAuth, async (_request, response) => {
+  response.json({
+    status: 'success',
+    caixas: await getCaixas(),
+  });
 });
 
 app.get('/api/public-store', async (_request, response) => {
@@ -629,3 +698,130 @@ if (fs.existsSync(DIST_DIR)) {
 app.listen(PORT, () => {
   console.log(`PaySuite local API ready on http://127.0.0.1:${PORT}`);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

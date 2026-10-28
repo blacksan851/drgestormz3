@@ -91,6 +91,8 @@ function getDefaultState() {
     apps: [],
     customers: [],
     subscriptions: [],
+    users: [],
+    caixas: [],
     config: {
       storeName: '',
       themeColor: 'emerald',
@@ -128,6 +130,8 @@ function normalizeState(rawState) {
     apps: Array.isArray(state.apps) ? state.apps.map((app) => hydrateApp(app)) : defaults.apps,
     customers: Array.isArray(state.customers) ? state.customers : defaults.customers,
     subscriptions: Array.isArray(state.subscriptions) ? state.subscriptions : defaults.subscriptions,
+    users: Array.isArray(state.users) ? state.users : defaults.users,
+    caixas: Array.isArray(state.caixas) ? state.caixas : defaults.caixas,
     config: { ...defaults.config, ...(state.config || {}) },
     logs: Array.isArray(state.logs) ? state.logs : defaults.logs,
     paymentConfig: { ...defaults.paymentConfig, ...(state.paymentConfig || {}) },
@@ -257,24 +261,18 @@ async function ensureMySqlStorage() {
     mysqlReadyPromise = (async () => {
       const pool = await getMySqlPool();
       await pool.query(`
-        CREATE TABLE IF NOT EXISTS \
-\`${MYSQL_TABLE}\
-\` (
+        CREATE TABLE IF NOT EXISTS \`${MYSQL_TABLE}\` (
           store_key VARCHAR(100) NOT NULL PRIMARY KEY,
           store_value LONGTEXT NOT NULL,
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
 
-      const [rows] = await pool.query(`SELECT store_value FROM \
-\`${MYSQL_TABLE}\
-\` WHERE store_key = ? LIMIT 1`, [STATE_KEY]);
+      const [rows] = await pool.query(`SELECT store_value FROM \`${MYSQL_TABLE}\` WHERE store_key = ? LIMIT 1`, [STATE_KEY]);
       if (!Array.isArray(rows) || rows.length === 0) {
         const seedState = await readSeedState();
         await pool.query(
-          `INSERT INTO \
-\`${MYSQL_TABLE}\
-\` (store_key, store_value) VALUES (?, ?)`,
+          `INSERT INTO \`${MYSQL_TABLE}\` (store_key, store_value) VALUES (?, ?)`,
           [STATE_KEY, JSON.stringify(seedState)],
         );
       }
@@ -324,9 +322,7 @@ async function ensureSupabaseStorage() {
 async function readMySqlState() {
   await ensureMySqlStorage();
   const pool = await getMySqlPool();
-  const [rows] = await pool.query(`SELECT store_value FROM \
-\`${MYSQL_TABLE}\
-\` WHERE store_key = ? LIMIT 1`, [STATE_KEY]);
+  const [rows] = await pool.query(`SELECT store_value FROM \`${MYSQL_TABLE}\` WHERE store_key = ? LIMIT 1`, [STATE_KEY]);
   const rawState = Array.isArray(rows) && rows[0] ? rows[0].store_value : '{}';
   return normalizeState(JSON.parse(rawState));
 }
@@ -336,9 +332,7 @@ async function writeMySqlState(nextState) {
   const pool = await getMySqlPool();
   await pool.query(
     `
-      INSERT INTO \
-\`${MYSQL_TABLE}\
-\` (store_key, store_value)
+      INSERT INTO \`${MYSQL_TABLE}\` (store_key, store_value)
       VALUES (?, ?)
       ON DUPLICATE KEY UPDATE
         store_value = VALUES(store_value),
@@ -432,6 +426,8 @@ export function sanitizeState(internalState) {
     apps: clone(internalState.apps),
     customers: clone(internalState.customers),
     subscriptions: clone(internalState.subscriptions),
+    users: clone(internalState.users),
+    caixas: clone(internalState.caixas),
     config: clone(internalState.config),
     logs: clone(internalState.logs),
     paymentConfig: sanitizePaymentConfig(internalState.paymentConfig),
@@ -701,6 +697,661 @@ export async function finalizePendingPayment(reference, outcome) {
 
   return nextState;
 }
+
+export async function registerCaixa(userData) {
+  const name = String(userData?.name || '').trim();
+  const login = String(userData?.login || '').trim();
+  const email = String(userData?.email || '').trim();
+  const password = String(userData?.password || '');
+  const caixa = String(userData?.caixa || '').trim();
+
+  if (!name || !login || !email || !password || !caixa) {
+    throw new Error('Todos os campos do caixa sao obrigatorios.');
+  }
+
+  if (password.length < 6) {
+    throw new Error('A senha deve ter pelo menos 6 caracteres.');
+  }
+
+  const state = await readInternalState();
+  const existingUsers = [...(Array.isArray(state.caixas) ? state.caixas : []), ...(Array.isArray(state.users) ? state.users : [])];
+
+  const normalizedLogin = login.toLowerCase();
+  const normalizedEmail = email.toLowerCase();
+  const normalizedCaixa = caixa.toLowerCase();
+
+  const exists = existingUsers.some((item) => (
+    String(item.login || '').trim().toLowerCase() === normalizedLogin
+    || String(item.email || '').trim().toLowerCase() === normalizedEmail
+    || String(item.caixa || '').trim().toLowerCase() === normalizedCaixa
+  ));
+
+  if (exists) {
+    throw new Error('Ja existe um caixa com este login, email ou numero de caixa.');
+  }
+
+  const nextUser = {
+    id: `caixa-${Date.now()}`,
+    name,
+    login,
+    email,
+    password,
+    role: 'caixa',
+    caixa,
+    createdAt: new Date().toISOString(),
+  };
+
+  await updateInternalState((currentState) => {
+    currentState.caixas = Array.isArray(currentState.caixas) ? [nextUser, ...currentState.caixas] : [nextUser];
+    return currentState;
+  });
+
+  return {
+    ...nextUser,
+    password: undefined,
+  };
+}
+
+export async function getCaixas() {
+  const state = await readInternalState();
+  return Array.isArray(state.caixas) ? state.caixas : [];
+}
+
+export async function findUserByCredentials(identifier, password) {
+  const normalizedIdentifier = String(identifier || '').trim().toLowerCase();
+  const rawPassword = String(password || '');
+
+  if (!normalizedIdentifier || !rawPassword) {
+    return null;
+  }
+
+  const state = await readInternalState();
+  const candidateUsers = [
+    ...(Array.isArray(state.caixas) ? state.caixas : []),
+    ...(Array.isArray(state.users) ? state.users : []),
+  ];
+
+  return candidateUsers.find((candidate) => {
+    const login = String(candidate.login || '').trim().toLowerCase();
+    const email = String(candidate.email || '').trim().toLowerCase();
+    const candidatePassword = String(candidate.password || '');
+    return (login === normalizedIdentifier || email === normalizedIdentifier) && candidatePassword === rawPassword;
+  }) || null;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
