@@ -35,18 +35,10 @@ async function requestJson(path: string, options: RequestInit = {}) {
 }
 
 export default function App() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState('');
   const [loginForm, setLoginForm] = useState({ identifier: 'admin', password: 'Admin@12345' });
-  const [registerForm, setRegisterForm] = useState({
-    name: '',
-    login: '',
-    email: '',
-    password: '',
-    caixa: '',
-  });
 
   useEffect(() => {
     const token = localStorage.getItem('drgestor_token');
@@ -87,38 +79,9 @@ export default function App() {
     }
   }
 
-  async function handleRegister(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError('');
-
-    try {
-      const response = await requestJson('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(registerForm),
-      });
-
-      setMode('login');
-      setLoginForm({
-        identifier: response.user?.login || registerForm.login,
-        password: registerForm.password,
-      });
-      setRegisterForm({
-        name: '',
-        login: '',
-        email: '',
-        password: '',
-        caixa: '',
-      });
-      setError('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao cadastrar o caixa.');
-    }
-  }
-
   function handleLogout() {
     localStorage.removeItem('drgestor_token');
     setUser(null);
-    setMode('login');
   }
 
   if (loading) {
@@ -182,104 +145,34 @@ export default function App() {
         <div className="brand-box">
           <p className="eyebrow">DR Gestor</p>
           <h1>Login</h1>
-          <p>Cadastro</p>
-        </div>
-
-        <div className="tabs">
-          <button
-            type="button"
-            className={mode === 'login' ? 'active' : ''}
-            onClick={() => setMode('login')}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            className={mode === 'register' ? 'active' : ''}
-            onClick={() => setMode('register')}
-          >
-            Cadastro
-          </button>
+          <p>Acesso do caixa</p>
         </div>
 
         {error ? <div className="error-box">{error}</div> : null}
 
-        {mode === 'login' ? (
-          <form onSubmit={handleLogin} className="auth-form">
-            <label>
-              Login ou email
-              <input
-                value={loginForm.identifier}
-                onChange={(event) => setLoginForm((current) => ({ ...current, identifier: event.target.value }))}
-                placeholder="admin ou caixa@exemplo.com"
-              />
-            </label>
+        <form onSubmit={handleLogin} className="auth-form">
+          <label>
+            Login ou email
+            <input
+              value={loginForm.identifier}
+              onChange={(event) => setLoginForm((current) => ({ ...current, identifier: event.target.value }))}
+              placeholder="admin ou caixa@exemplo.com"
+            />
+          </label>
 
-            <label>
-              Senha
-              <input
-                type="password"
-                value={loginForm.password}
-                onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
-                placeholder="••••••••"
-              />
-            </label>
+          <label>
+            Senha
+            <input
+              type="password"
+              value={loginForm.password}
+              onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
+              placeholder="••••••••"
+            />
+          </label>
 
-            <button type="submit" className="primary-button">Acessar sistema</button>
-            <small className="helper-text">Padrao admin: admin / Admin@12345</small>
-          </form>
-        ) : (
-          <form onSubmit={handleRegister} className="auth-form">
-            <label>
-              Nome do caixa
-              <input
-                value={registerForm.name}
-                onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Ex.: Paulo Mavie"
-              />
-            </label>
-
-            <label>
-              Login
-              <input
-                value={registerForm.login}
-                onChange={(event) => setRegisterForm((current) => ({ ...current, login: event.target.value }))}
-                placeholder="paulomavie"
-              />
-            </label>
-
-            <label>
-              Email
-              <input
-                type="email"
-                value={registerForm.email}
-                onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))}
-                placeholder="caixa@drgestor.com"
-              />
-            </label>
-
-            <label>
-              Numero do caixa
-              <input
-                value={registerForm.caixa}
-                onChange={(event) => setRegisterForm((current) => ({ ...current, caixa: event.target.value }))}
-                placeholder="CX-001"
-              />
-            </label>
-
-            <label>
-              Senha
-              <input
-                type="password"
-                value={registerForm.password}
-                onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))}
-                placeholder="Mínimo 6 caracteres"
-              />
-            </label>
-
-            <button type="submit" className="primary-button">Salvar caixa</button>
-          </form>
-        )}
+          <button type="submit" className="primary-button">Entrar</button>
+          <small className="helper-text">Padrao admin: admin / Admin@12345</small>
+        </form>
       </div>
     </div>
   );
