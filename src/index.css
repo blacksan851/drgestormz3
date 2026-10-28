@@ -3,8 +3,23 @@
 }
 
 :root {
-  color: #f5f7ff;
-  background: #081325;
+  --base-bg-900: #081325;
+  --base-bg-800: #0f1f35;
+  --base-bg-700: #142b49;
+  --base-panel: rgba(13, 24, 39, 0.92);
+  --base-panel-strong: rgba(9, 20, 34, 0.9);
+  --base-border: rgba(149, 183, 255, 0.18);
+  --base-border-soft: rgba(148, 163, 184, 0.32);
+  --base-text: #f5f7ff;
+  --base-text-soft: #bbcae7;
+  --base-muted: #dfe9ff;
+  --base-accent: #2563eb;
+  --base-accent-2: #0ea5e9;
+  --base-focus: #7dd3fc;
+  --base-button-shadow: rgba(37, 99, 235, 0.45);
+  --base-button-text: #ffffff;
+  color: var(--base-text);
+  background: var(--base-bg-900);
   font-family: Inter, 'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -17,7 +32,7 @@ html, body, #root {
 }
 
 body {
-  background: radial-gradient(circle at top, #142b49 0%, #081325 48%, #040b16 100%);
+  background: radial-gradient(circle at top, var(--base-bg-700) 0%, var(--base-bg-900) 48%, #040b16 100%);
 }
 
 button, input {
@@ -37,7 +52,7 @@ button {
 }
 
 .loading-screen {
-  color: #dfe9ff;
+  color: var(--base-muted);
   font-size: 1.1rem;
 }
 
@@ -47,8 +62,8 @@ button {
 
 .auth-card {
   width: min(520px, 100%);
-  background: rgba(13, 24, 39, 0.92);
-  border: 1px solid rgba(149, 183, 255, 0.18);
+  background: var(--base-panel);
+  border: 1px solid var(--base-border);
   border-radius: 24px;
   padding: 28px;
   box-shadow: 0 30px 50px rgba(0, 0, 0, 0.35);
@@ -61,7 +76,7 @@ button {
 .eyebrow {
   margin: 0 0 6px;
   letter-spacing: 0.12em;
-  color: #7dd3fc;
+  color: var(--base-focus);
   text-transform: uppercase;
   font-size: 0.76rem;
   font-weight: 700;
@@ -78,7 +93,7 @@ h1 {
 
 .brand-box p:last-child {
   margin-bottom: 0;
-  color: #bbcae7;
+  color: var(--base-text-soft);
 }
 
 .tabs {
@@ -95,14 +110,14 @@ h1 {
   background: transparent;
   border-radius: 10px;
   font-weight: 600;
-  color: #dfe9ff;
+  color: var(--base-muted);
   padding: 10px 12px;
   transition: all 0.2s ease;
 }
 
 .tabs button.active {
-  background: linear-gradient(135deg, #2563eb, #0ea5e9);
-  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.45);
+  background: linear-gradient(135deg, var(--base-accent), var(--base-accent-2));
+  box-shadow: 0 10px 25px var(--base-button-shadow);
 }
 
 .auth-form {
@@ -116,12 +131,12 @@ h1 {
   flex-direction: column;
   gap: 8px;
   font-weight: 600;
-  color: #dfe9ff;
+  color: var(--base-muted);
 }
 
 .auth-form input {
   background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.32);
+  border: 1px solid var(--base-border-soft);
   color: #f8fafc;
   border-radius: 12px;
   padding: 12px 14px;
@@ -129,7 +144,7 @@ h1 {
 }
 
 .auth-form input:focus {
-  border-color: #7dd3fc;
+  border-color: var(--base-focus);
   box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
 }
 
@@ -140,9 +155,9 @@ h1 {
   border-radius: 12px;
   padding: 12px 16px;
   font-weight: 700;
-  background: linear-gradient(135deg, #10b981, #14b8a6);
-  color: white;
-  box-shadow: 0 18px 28px rgba(16, 185, 129, 0.35);
+  background: linear-gradient(135deg, var(--base-accent), var(--base-accent-2));
+  color: var(--base-button-text);
+  box-shadow: 0 18px 28px rgba(37, 99, 235, 0.35);
 }
 
 .logout-button {
@@ -197,7 +212,7 @@ h1 {
 }
 
 .panel {
-  background: rgba(9, 20, 34, 0.9);
+  background: var(--base-panel-strong);
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 18px;
   padding: 22px;
